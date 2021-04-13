@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2015-present, Facebook, Inc.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -9,15 +9,19 @@
 
 import './ReactNativeInjectionShared';
 
-import * as ReactFabricComponentTree from './ReactFabricComponentTree';
-import * as EventPluginUtils from 'events/EventPluginUtils';
+import {
+  getFiberCurrentPropsFromNode,
+  getInstanceFromNode,
+  getNodeFromInstance,
+} from './ReactFabricComponentTree';
+import {setComponentTree} from './legacy-events/EventPluginUtils';
 import ReactFabricGlobalResponderHandler from './ReactFabricGlobalResponderHandler';
-import ResponderEventPlugin from 'events/ResponderEventPlugin';
+import ResponderEventPlugin from './legacy-events/ResponderEventPlugin';
 
-EventPluginUtils.setComponentTree(
-  ReactFabricComponentTree.getFiberCurrentPropsFromNode,
-  ReactFabricComponentTree.getInstanceFromNode,
-  ReactFabricComponentTree.getNodeFromInstance,
+setComponentTree(
+  getFiberCurrentPropsFromNode,
+  getInstanceFromNode,
+  getNodeFromInstance,
 );
 
 ResponderEventPlugin.injection.injectGlobalResponderHandler(

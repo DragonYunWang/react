@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-present, Facebook, Inc.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -315,5 +315,25 @@ describe('ReactEmptyComponent', () => {
     ReactDOM.render(<Empty />, container);
     const noscript2 = container.firstChild;
     expect(noscript2).toBe(null);
+  });
+
+  it('should warn about React.forwardRef that returns undefined', () => {
+    const Empty = () => {};
+    const EmptyForwardRef = React.forwardRef(Empty);
+
+    expect(() => {
+      ReactTestUtils.renderIntoDocument(<EmptyForwardRef />);
+    }).toThrowError(
+      'ForwardRef(Empty)(...): Nothing was returned from render.',
+    );
+  });
+
+  it('should warn about React.memo that returns undefined', () => {
+    const Empty = () => {};
+    const EmptyMemo = React.memo(Empty);
+
+    expect(() => {
+      ReactTestUtils.renderIntoDocument(<EmptyMemo />);
+    }).toThrowError('Empty(...): Nothing was returned from render.');
   });
 });

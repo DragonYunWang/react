@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-present, Facebook, Inc.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -12,12 +12,15 @@
 
 let React;
 let ReactTestRenderer;
+let Scheduler;
 
 describe('ReactTestRendererAsync', () => {
   beforeEach(() => {
     jest.resetModules();
+
     React = require('react');
     ReactTestRenderer = require('react-test-renderer');
+    Scheduler = require('scheduler');
   });
 
   it('flushAll flushes all work', () => {
@@ -25,14 +28,14 @@ describe('ReactTestRendererAsync', () => {
       return props.children;
     }
     const renderer = ReactTestRenderer.create(<Foo>Hi</Foo>, {
-      unstable_isAsync: true,
+      unstable_isConcurrent: true,
     });
 
     // Before flushing, nothing has mounted.
     expect(renderer.toJSON()).toEqual(null);
 
     // Flush initial mount.
-    expect(renderer).toFlushAll([]);
+    expect(Scheduler).toFlushWithoutYielding();
     expect(renderer.toJSON()).toEqual('Hi');
 
     // Update
@@ -40,67 +43,79 @@ describe('ReactTestRendererAsync', () => {
     // Not yet updated.
     expect(renderer.toJSON()).toEqual('Hi');
     // Flush update.
-    expect(renderer).toFlushAll([]);
+    expect(Scheduler).toFlushWithoutYielding();
     expect(renderer.toJSON()).toEqual('Bye');
   });
 
   it('flushAll returns array of yielded values', () => {
     function Child(props) {
-      ReactTestRenderer.unstable_yield(props.children);
+      Scheduler.unstable_yieldValue(props.children);
       return props.children;
     }
     function Parent(props) {
       return (
-        <React.Fragment>
+        <>
           <Child>{'A:' + props.step}</Child>
           <Child>{'B:' + props.step}</Child>
           <Child>{'C:' + props.step}</Child>
-        </React.Fragment>
+        </>
       );
     }
     const renderer = ReactTestRenderer.create(<Parent step={1} />, {
-      unstable_isAsync: true,
+      unstable_isConcurrent: true,
     });
 
-    expect(renderer).toFlushAll(['A:1', 'B:1', 'C:1']);
+    expect(Scheduler).toFlushAndYield(['A:1', 'B:1', 'C:1']);
     expect(renderer.toJSON()).toEqual(['A:1', 'B:1', 'C:1']);
 
     renderer.update(<Parent step={2} />);
-    expect(renderer).toFlushAll(['A:2', 'B:2', 'C:2']);
+    expect(Scheduler).toFlushAndYield(['A:2', 'B:2', 'C:2']);
     expect(renderer.toJSON()).toEqual(['A:2', 'B:2', 'C:2']);
   });
 
+  // @gate experimental || !enableSyncDefaultUpdates
   it('flushThrough flushes until the expected values is yielded', () => {
     function Child(props) {
-      ReactTestRenderer.unstable_yield(props.children);
+      Scheduler.unstable_yieldValue(props.children);
       return props.children;
     }
     function Parent(props) {
       return (
-        <React.Fragment>
+        <>
           <Child>{'A:' + props.step}</Child>
           <Child>{'B:' + props.step}</Child>
           <Child>{'C:' + props.step}</Child>
-        </React.Fragment>
+        </>
       );
     }
-    const renderer = ReactTestRenderer.create(<Parent step={1} />, {
-      unstable_isAsync: true,
-    });
+
+    let renderer;
+    if (gate(flags => flags.enableSyncDefaultUpdates)) {
+      React.unstable_startTransition(() => {
+        renderer = ReactTestRenderer.create(<Parent step={1} />, {
+          unstable_isConcurrent: true,
+        });
+      });
+    } else {
+      renderer = ReactTestRenderer.create(<Parent step={1} />, {
+        unstable_isConcurrent: true,
+      });
+    }
 
     // Flush the first two siblings
-    expect(renderer).toFlushThrough(['A:1', 'B:1']);
+    expect(Scheduler).toFlushAndYieldThrough(['A:1', 'B:1']);
     // Did not commit yet.
     expect(renderer.toJSON()).toEqual(null);
 
     // Flush the remaining work
-    expect(renderer).toFlushAll(['C:1']);
+    expect(Scheduler).toFlushAndYield(['C:1']);
     expect(renderer.toJSON()).toEqual(['A:1', 'B:1', 'C:1']);
   });
 
+  // @gate experimental || !enableSyncDefaultUpdates
   it('supports high priority interruptions', () => {
     function Child(props) {
-      ReactTestRenderer.unstable_yield(props.children);
+      Scheduler.unstable_yieldValue(props.children);
       return props.children;
     }
 
@@ -113,20 +128,29 @@ describe('ReactTestRendererAsync', () => {
       }
       render() {
         return (
-          <React.Fragment>
+          <>
             <Child>{'A:' + this.props.step}</Child>
             <Child>{'B:' + this.props.step}</Child>
-          </React.Fragment>
+          </>
         );
       }
     }
 
-    const renderer = ReactTestRenderer.create(<Example step={1} />, {
-      unstable_isAsync: true,
-    });
+    let renderer;
+    if (gate(flags => flags.enableSyncDefaultUpdates)) {
+      React.unstable_startTransition(() => {
+        renderer = ReactTestRenderer.create(<Example step={1} />, {
+          unstable_isConcurrent: true,
+        });
+      });
+    } else {
+      renderer = ReactTestRenderer.create(<Example step={1} />, {
+        unstable_isConcurrent: true,
+      });
+    }
 
     // Flush the some of the changes, but don't commit
-    expect(renderer).toFlushThrough(['A:1']);
+    expect(Scheduler).toFlushAndYieldThrough(['A:1']);
     expect(renderer.toJSON()).toEqual(null);
 
     // Interrupt with higher priority properties
@@ -139,31 +163,31 @@ describe('ReactTestRendererAsync', () => {
   });
 
   describe('Jest matchers', () => {
-    it('toFlushThrough', () => {
+    it('toFlushAndYieldThrough', () => {
       const Yield = ({id}) => {
-        ReactTestRenderer.unstable_yield(id);
+        Scheduler.unstable_yieldValue(id);
         return id;
       };
 
-      const renderer = ReactTestRenderer.create(
+      ReactTestRenderer.create(
         <div>
           <Yield id="foo" />
           <Yield id="bar" />
           <Yield id="baz" />
         </div>,
         {
-          unstable_isAsync: true,
+          unstable_isConcurrent: true,
         },
       );
 
-      expect(() => expect(renderer).toFlushThrough(['foo', 'baz'])).toThrow(
-        'Expected value to equal:',
-      );
+      expect(() =>
+        expect(Scheduler).toFlushAndYieldThrough(['foo', 'baz']),
+      ).toThrow('// deep equality');
     });
 
-    it('toFlushAll', () => {
+    it('toFlushAndYield', () => {
       const Yield = ({id}) => {
-        ReactTestRenderer.unstable_yield(id);
+        Scheduler.unstable_yieldValue(id);
         return id;
       };
 
@@ -174,12 +198,12 @@ describe('ReactTestRendererAsync', () => {
           <Yield id="baz" />
         </div>,
         {
-          unstable_isAsync: true,
+          unstable_isConcurrent: true,
         },
       );
 
-      expect(() => expect(renderer).toFlushAll([])).toThrowError(
-        'Expected value to equal:',
+      expect(() => expect(Scheduler).toFlushWithoutYielding()).toThrowError(
+        '// deep equality',
       );
 
       renderer.update(
@@ -190,14 +214,14 @@ describe('ReactTestRendererAsync', () => {
         </div>,
       );
 
-      expect(() => expect(renderer).toFlushAll(['foo', 'baz'])).toThrow(
-        'Expected value to equal:',
+      expect(() => expect(Scheduler).toFlushAndYield(['foo', 'baz'])).toThrow(
+        '// deep equality',
       );
     });
 
     it('toFlushAndThrow', () => {
       const Yield = ({id}) => {
-        ReactTestRenderer.unstable_yield(id);
+        Scheduler.unstable_yieldValue(id);
         return id;
       };
 
@@ -218,40 +242,25 @@ describe('ReactTestRendererAsync', () => {
       }
 
       const renderer = ReactTestRenderer.create(<App />, {
-        unstable_isAsync: true,
+        unstable_isConcurrent: true,
       });
 
-      expect(() => {
-        expect(renderer).toFlushAndThrow(
-          // Wrong expected values
-          ['A', 'B'],
-          'Oh no!',
-        );
-      }).toThrow('Expected value to equal:');
+      expect(Scheduler).toFlushAndThrow('Oh no!');
+      expect(Scheduler).toHaveYielded(['A', 'B', 'C', 'D', 'A', 'B', 'C', 'D']);
 
       renderer.update(<App />);
 
-      expect(() => {
-        expect(renderer).toFlushAndThrow(
-          ['A', 'B', 'C', 'D', 'A', 'B', 'C', 'D'],
-          // Wrong error message
-          'Oops!',
-        );
-      }).toThrow('Expected the function to throw an error matching:');
+      expect(Scheduler).toFlushAndThrow('Oh no!');
+      expect(Scheduler).toHaveYielded(['A', 'B', 'C', 'D', 'A', 'B', 'C', 'D']);
 
       renderer.update(<App />);
-
-      // Passes
-      expect(renderer).toFlushAndThrow(
-        ['A', 'B', 'C', 'D', 'A', 'B', 'C', 'D'],
-        'Oh no!',
-      );
+      expect(Scheduler).toFlushAndThrow('Oh no!');
     });
   });
 
-  it('toClearYields', () => {
+  it('toHaveYielded', () => {
     const Yield = ({id}) => {
-      ReactTestRenderer.unstable_yield(id);
+      Scheduler.unstable_yieldValue(id);
       return id;
     };
 
@@ -266,8 +275,18 @@ describe('ReactTestRendererAsync', () => {
     }
 
     ReactTestRenderer.create(<App />);
-    expect(() => expect(ReactTestRenderer).toClearYields(['A', 'B'])).toThrow(
-      'Expected value to equal:',
+    expect(() => expect(Scheduler).toHaveYielded(['A', 'B'])).toThrow(
+      '// deep equality',
+    );
+  });
+
+  it('flush methods throw if log is not empty', () => {
+    ReactTestRenderer.create(<div />, {
+      unstable_isConcurrent: true,
+    });
+    Scheduler.unstable_yieldValue('Something');
+    expect(() => expect(Scheduler).toFlushWithoutYielding()).toThrow(
+      'Log of yielded values is not empty.',
     );
   });
 });

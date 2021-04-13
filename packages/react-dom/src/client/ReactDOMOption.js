@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-present, Facebook, Inc.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -7,8 +7,7 @@
  * @flow
  */
 
-import React from 'react';
-import warning from 'shared/warning';
+import {Children} from 'react';
 import {getToStringValue, toString} from './ToStringValue';
 
 let didWarnSelectedSetOnOption = false;
@@ -22,14 +21,14 @@ function flattenChildren(children) {
   // Note that this would throw on non-element objects.
   // Elements are stringified (which is normally irrelevant
   // but matters for <fbt>).
-  React.Children.forEach(children, function(child) {
+  Children.forEach(children, function(child) {
     if (child == null) {
       return;
     }
-    content += child;
+    content += (child: any);
     // Note: we don't warn about invalid children here.
     // Instead, this is done separately below so that
-    // it happens during the hydration codepath too.
+    // it happens during the hydration code path too.
   });
 
   return content;
@@ -41,25 +40,24 @@ function flattenChildren(children) {
 
 export function validateProps(element: Element, props: Object) {
   if (__DEV__) {
-    // This mirrors the codepath above, but runs for hydration too.
+    // This mirrors the code path above, but runs for hydration too.
     // Warn about invalid children here so that client and hydration are consistent.
     // TODO: this seems like it could cause a DEV-only throw for hydration
     // if children contains a non-element object. We should try to avoid that.
     if (typeof props.children === 'object' && props.children !== null) {
-      React.Children.forEach(props.children, function(child) {
+      Children.forEach(props.children, function(child) {
         if (child == null) {
           return;
         }
         if (typeof child === 'string' || typeof child === 'number') {
           return;
         }
-        if (typeof child.type !== 'string') {
+        if (typeof (child: any).type !== 'string') {
           return;
         }
         if (!didWarnInvalidChild) {
           didWarnInvalidChild = true;
-          warning(
-            false,
+          console.error(
             'Only strings and numbers are supported as <option> children.',
           );
         }
@@ -68,8 +66,7 @@ export function validateProps(element: Element, props: Object) {
 
     // TODO: Remove support for `selected` in <option>.
     if (props.selected != null && !didWarnSelectedSetOnOption) {
-      warning(
-        false,
+      console.error(
         'Use the `defaultValue` or `value` props on <select> instead of ' +
           'setting `selected` on <option>.',
       );

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-present, Facebook, Inc.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -152,7 +152,15 @@ export function getModernOffsetsFromPoints(
  */
 export function setOffsets(node, offsets) {
   const doc = node.ownerDocument || document;
-  const win = doc ? doc.defaultView : window;
+  const win = (doc && doc.defaultView) || window;
+
+  // Edge fails with "Object expected" in some scenarios.
+  // (For instance: TinyMCE editor used in a list component that supports pasting to add more,
+  // fails when pasting 100+ items)
+  if (!win.getSelection) {
+    return;
+  }
+
   const selection = win.getSelection();
   const length = node.textContent.length;
   let start = Math.min(offsets.start, length);
@@ -161,7 +169,7 @@ export function setOffsets(node, offsets) {
   // IE 11 uses modern selection, but doesn't support the extend method.
   // Flip backward selections, so we can set with a single range.
   if (!selection.extend && start > end) {
-    let temp = end;
+    const temp = end;
     end = start;
     start = temp;
   }

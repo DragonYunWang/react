@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-present, Facebook, Inc.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -7,32 +7,33 @@
  * @flow
  */
 
-import type {ReactNativeBaseComponentViewConfig} from './ReactNativeTypes';
+import type {TouchedViewDataAtPoint} from './ReactNativeTypes';
 
 import invariant from 'shared/invariant';
 
 // Modules provided by RN:
-import UIManager from 'UIManager';
-import deepFreezeAndThrowOnMutationInDev from 'deepFreezeAndThrowOnMutationInDev';
+import {
+  ReactNativeViewConfigRegistry,
+  UIManager,
+  deepFreezeAndThrowOnMutationInDev,
+} from 'react-native/Libraries/ReactPrivate/ReactNativePrivateInterface';
 
-import * as ReactNativeViewConfigRegistry from 'ReactNativeViewConfigRegistry';
-import * as ReactNativeAttributePayload from './ReactNativeAttributePayload';
+import {create, diff} from './ReactNativeAttributePayload';
 import {
   precacheFiberNode,
   uncacheFiberNode,
   updateFiberProps,
 } from './ReactNativeComponentTree';
 import ReactNativeFiberHostComponent from './ReactNativeFiberHostComponent';
-import * as ReactNativeFrameScheduling from './ReactNativeFrameScheduling';
+
+import {DefaultEventPriority} from 'react-reconciler/src/ReactEventPriorities';
+
+const {get: getViewConfigForType} = ReactNativeViewConfigRegistry;
 
 export type Type = string;
 export type Props = Object;
 export type Container = number;
-export type Instance = {
-  _children: Array<Instance | number>,
-  _nativeTag: number,
-  viewConfig: ReactNativeBaseComponentViewConfig<>,
-};
+export type Instance = ReactNativeFiberHostComponent;
 export type TextInstance = number;
 export type HydratableInstance = Instance | TextInstance;
 export type PublicInstance = Instance;
@@ -44,6 +45,18 @@ export type ChildSet = void; // Unused
 
 export type TimeoutHandle = TimeoutID;
 export type NoTimeout = -1;
+export type OpaqueIDType = void;
+
+export type RendererInspectionConfig = $ReadOnly<{|
+  // Deprecated. Replaced with getInspectorDataForViewAtPoint.
+  getInspectorDataForViewTag?: (tag: number) => Object,
+  getInspectorDataForViewAtPoint?: (
+    inspectedView: Object,
+    locationX: number,
+    locationY: number,
+    callback: (viewData: TouchedViewDataAtPoint) => mixed,
+  ) => void,
+|}>;
 
 const UPDATE_SIGNAL = {};
 if (__DEV__) {
@@ -74,8 +87,11 @@ function recursivelyUncacheFiberNode(node: Instance | TextInstance) {
   }
 }
 
-export * from 'shared/HostConfigWithNoPersistence';
-export * from 'shared/HostConfigWithNoHydration';
+export * from 'react-reconciler/src/ReactFiberHostConfigWithNoPersistence';
+export * from 'react-reconciler/src/ReactFiberHostConfigWithNoHydration';
+export * from 'react-reconciler/src/ReactFiberHostConfigWithNoScopes';
+export * from 'react-reconciler/src/ReactFiberHostConfigWithNoTestSelectors';
+export * from 'react-reconciler/src/ReactFiberHostConfigWithNoMicrotasks';
 
 export function appendInitialChild(
   parentInstance: Instance,
@@ -92,7 +108,7 @@ export function createInstance(
   internalInstanceHandle: Object,
 ): Instance {
   const tag = allocateTag();
-  const viewConfig = ReactNativeViewConfigRegistry.get(type);
+  const viewConfig = getViewConfigForType(type);
 
   if (__DEV__) {
     for (const key in viewConfig.validAttributes) {
@@ -102,15 +118,7 @@ export function createInstance(
     }
   }
 
-  invariant(
-    type !== 'RCTView' || !hostContext.isInAParentText,
-    'Nesting of <View> within <Text> is not currently supported.',
-  );
-
-  const updatePayload = ReactNativeAttributePayload.create(
-    props,
-    viewConfig.validAttributes,
-  );
+  const updatePayload = create(props, viewConfig.validAttributes);
 
   UIManager.createView(
     tag, // reactTag
@@ -119,7 +127,11 @@ export function createInstance(
     updatePayload, // props
   );
 
-  const component = new ReactNativeFiberHostComponent(tag, viewConfig);
+  const component = new ReactNativeFiberHostComponent(
+    tag,
+    viewConfig,
+    internalInstanceHandle,
+  );
 
   precacheFiberNode(internalInstanceHandle, tag);
   updateFiberProps(tag, props);
@@ -168,11 +180,10 @@ export function finalizeInitialChildren(
 
   // Map from child objects to native tags.
   // Either way we need to pass a copy of the Array to prevent it from being frozen.
-  const nativeTags = parentInstance._children.map(
-    child =>
-      typeof child === 'number'
-        ? child // Leaf node (eg text)
-        : child._nativeTag,
+  const nativeTags = parentInstance._children.map(child =>
+    typeof child === 'number'
+      ? child // Leaf node (eg text)
+      : child._nativeTag,
   );
 
   UIManager.setChildren(
@@ -213,8 +224,9 @@ export function getPublicInstance(instance: Instance): * {
   return instance;
 }
 
-export function prepareForCommit(containerInfo: Container): void {
+export function prepareForCommit(containerInfo: Container): null | Object {
   // Noop
+  return null;
 }
 
 export function prepareUpdate(
@@ -232,20 +244,12 @@ export function resetAfterCommit(containerInfo: Container): void {
   // Noop
 }
 
-export const now = ReactNativeFrameScheduling.now;
 export const isPrimaryRenderer = true;
-export const scheduleDeferredCallback =
-  ReactNativeFrameScheduling.scheduleDeferredCallback;
-export const cancelDeferredCallback =
-  ReactNativeFrameScheduling.cancelDeferredCallback;
+export const warnsIfNotActing = true;
 
 export const scheduleTimeout = setTimeout;
 export const cancelTimeout = clearTimeout;
 export const noTimeout = -1;
-
-export function shouldDeprioritizeSubtree(type: string, props: Props): boolean {
-  return false;
-}
 
 export function shouldSetTextContent(type: string, props: Props): boolean {
   // TODO (bvaughn) Revisit this decision.
@@ -255,6 +259,10 @@ export function shouldSetTextContent(type: string, props: Props): boolean {
   // It's not clear to me which is better so I'm deferring for now.
   // More context @ github.com/facebook/react/pull/8560#discussion_r92111303
   return false;
+}
+
+export function getCurrentEventPriority(): * {
+  return DefaultEventPriority;
 }
 
 // -------------------
@@ -341,11 +349,7 @@ export function commitUpdate(
 
   updateFiberProps(instance._nativeTag, newProps);
 
-  const updatePayload = ReactNativeAttributePayload.diff(
-    oldProps,
-    newProps,
-    viewConfig.validAttributes,
-  );
+  const updatePayload = diff(oldProps, newProps, viewConfig.validAttributes);
 
   // Avoid the overhead of bridge calls if there's no update.
   // This is an expensive no-op for Android, and causes an unnecessary
@@ -450,4 +454,85 @@ export function removeChildFromContainer(
 
 export function resetTextContent(instance: Instance): void {
   // Noop
+}
+
+export function hideInstance(instance: Instance): void {
+  const viewConfig = instance.viewConfig;
+  const updatePayload = create(
+    {style: {display: 'none'}},
+    viewConfig.validAttributes,
+  );
+  UIManager.updateView(
+    instance._nativeTag,
+    viewConfig.uiViewClassName,
+    updatePayload,
+  );
+}
+
+export function hideTextInstance(textInstance: TextInstance): void {
+  throw new Error('Not yet implemented.');
+}
+
+export function unhideInstance(instance: Instance, props: Props): void {
+  const viewConfig = instance.viewConfig;
+  const updatePayload = diff(
+    {...props, style: [props.style, {display: 'none'}]},
+    props,
+    viewConfig.validAttributes,
+  );
+  UIManager.updateView(
+    instance._nativeTag,
+    viewConfig.uiViewClassName,
+    updatePayload,
+  );
+}
+
+export function clearContainer(container: Container): void {
+  // TODO Implement this for React Native
+  // UIManager does not expose a "remove all" type method.
+}
+
+export function unhideTextInstance(
+  textInstance: TextInstance,
+  text: string,
+): void {
+  throw new Error('Not yet implemented.');
+}
+
+export function getInstanceFromNode(node: any) {
+  throw new Error('Not yet implemented.');
+}
+
+export function isOpaqueHydratingObject(value: mixed): boolean {
+  throw new Error('Not yet implemented');
+}
+
+export function makeOpaqueHydratingObject(
+  attemptToReadValue: () => void,
+): OpaqueIDType {
+  throw new Error('Not yet implemented.');
+}
+
+export function makeClientId(): OpaqueIDType {
+  throw new Error('Not yet implemented');
+}
+
+export function makeClientIdInDEV(warnOnAccessInDEV: () => void): OpaqueIDType {
+  throw new Error('Not yet implemented');
+}
+
+export function beforeActiveInstanceBlur(internalInstanceHandle: Object) {
+  // noop
+}
+
+export function afterActiveInstanceBlur() {
+  // noop
+}
+
+export function preparePortalMount(portalInstance: Instance): void {
+  // noop
+}
+
+export function detachDeletedInstance(node: Instance): void {
+  // noop
 }

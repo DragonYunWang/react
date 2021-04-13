@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-present, Facebook, Inc.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -14,7 +14,7 @@ invariant(
   'Expected ReactFbErrorUtils.invokeGuardedCallback to be a function.',
 );
 
-let invokeGuardedCallbackImpl = function<A, B, C, D, E, F, Context>(
+const invokeGuardedCallbackImpl = function<A, B, C, D, E, F, Context>(
   name: string | null,
   func: (a: A, b: B, c: C, d: D, e: E, f: F) => mixed,
   context: Context,

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2013-present, Facebook, Inc.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -139,7 +139,7 @@ describe('ReactDOM', () => {
     expect(() => {
       expect(() => {
         ReactDOM.render(<A />, myDiv, 'no');
-      }).toWarnDev(
+      }).toErrorDev(
         'render(...): Expected the last optional `callback` argument to be ' +
           'a function. Instead received: no.',
       );
@@ -151,7 +151,7 @@ describe('ReactDOM', () => {
     expect(() => {
       expect(() => {
         ReactDOM.render(<A />, myDiv, {foo: 'bar'});
-      }).toWarnDev(
+      }).toErrorDev(
         'render(...): Expected the last optional `callback` argument to be ' +
           'a function. Instead received: [object Object].',
       );
@@ -163,7 +163,7 @@ describe('ReactDOM', () => {
     expect(() => {
       expect(() => {
         ReactDOM.render(<A />, myDiv, new Foo());
-      }).toWarnDev(
+      }).toErrorDev(
         'render(...): Expected the last optional `callback` argument to be ' +
           'a function. Instead received: [object Object].',
       );
@@ -192,7 +192,7 @@ describe('ReactDOM', () => {
     expect(() => {
       expect(() => {
         ReactDOM.render(<A />, myDiv, 'no');
-      }).toWarnDev(
+      }).toErrorDev(
         'render(...): Expected the last optional `callback` argument to be ' +
           'a function. Instead received: no.',
       );
@@ -205,7 +205,7 @@ describe('ReactDOM', () => {
     expect(() => {
       expect(() => {
         ReactDOM.render(<A />, myDiv, {foo: 'bar'});
-      }).toWarnDev(
+      }).toErrorDev(
         'render(...): Expected the last optional `callback` argument to be ' +
           'a function. Instead received: [object Object].',
       );
@@ -218,7 +218,7 @@ describe('ReactDOM', () => {
     expect(() => {
       expect(() => {
         ReactDOM.render(<A />, myDiv, new Foo());
-      }).toWarnDev(
+      }).toErrorDev(
         'render(...): Expected the last optional `callback` argument to be ' +
           'a function. Instead received: [object Object].',
       );
@@ -359,6 +359,7 @@ describe('ReactDOM', () => {
         '1st node clicked',
         "2nd node clicked imperatively from 1st's handler",
       ];
+
       expect(actual).toEqual(expected);
     } finally {
       document.body.removeChild(container);
@@ -387,7 +388,7 @@ describe('ReactDOM', () => {
     }
   });
 
-  it('should not crash calling findDOMNode inside a functional component', () => {
+  it('should not crash calling findDOMNode inside a function component', () => {
     const container = document.createElement('div');
 
     class Component extends React.Component {
@@ -450,20 +451,6 @@ describe('ReactDOM', () => {
     }
   });
 
-  it('warns when requestAnimationFrame is not polyfilled', () => {
-    const previousRAF = global.requestAnimationFrame;
-    try {
-      delete global.requestAnimationFrame;
-      jest.resetModules();
-      expect(() => require('react-dom')).toWarnDev(
-        "This browser doesn't support requestAnimationFrame.",
-        {withoutStack: true},
-      );
-    } finally {
-      global.requestAnimationFrame = previousRAF;
-    }
-  });
-
   it('reports stacks with re-entrant renderToString() calls on the client', () => {
     function Child2(props) {
       return <span ariaTypo3="no">{props.children}</span>;
@@ -498,7 +485,7 @@ describe('ReactDOM', () => {
     }
 
     const container = document.createElement('div');
-    expect(() => ReactDOM.render(<App />, container)).toWarnDev([
+    expect(() => ReactDOM.render(<App />, container)).toErrorDev([
       // ReactDOM(App > div > span)
       'Invalid ARIA attribute `ariaTypo`. ARIA attributes follow the pattern aria-* and must be lowercase.\n' +
         '    in span (at **)\n' +

@@ -1,12 +1,11 @@
 /**
- * Copyright (c) 2013-present, Facebook, Inc.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
 
 import invariant from 'shared/invariant';
-import lowPriorityWarning from 'shared/lowPriorityWarning';
 
 import ReactNoopUpdateQueue from './ReactNoopUpdateQueue';
 
@@ -105,8 +104,7 @@ if (__DEV__) {
   const defineDeprecationWarning = function(methodName, info) {
     Object.defineProperty(Component.prototype, methodName, {
       get: function() {
-        lowPriorityWarning(
-          false,
+        console.warn(
           '%s(...) is deprecated in plain JavaScript React classes. %s',
           info[0],
           info[1],

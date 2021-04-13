@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2015-present, Facebook, Inc.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
@@ -14,10 +14,13 @@
  * TODO: require this in packager, not in React #10932517
  */
 // Module provided by RN:
-import 'InitializeCore';
+import 'react-native/Libraries/ReactPrivate/ReactNativePrivateInitializeCore';
 
-import * as EventPluginHub from 'events/EventPluginHub';
-import ResponderEventPlugin from 'events/ResponderEventPlugin';
+import ResponderEventPlugin from './legacy-events/ResponderEventPlugin';
+import {
+  injectEventPluginOrder,
+  injectEventPluginsByName,
+} from './legacy-events/EventPluginRegistry';
 
 import ReactNativeBridgeEventPlugin from './ReactNativeBridgeEventPlugin';
 import ReactNativeEventPluginOrder from './ReactNativeEventPluginOrder';
@@ -25,13 +28,13 @@ import ReactNativeEventPluginOrder from './ReactNativeEventPluginOrder';
 /**
  * Inject module for resolving DOM hierarchy and plugin ordering.
  */
-EventPluginHub.injection.injectEventPluginOrder(ReactNativeEventPluginOrder);
+injectEventPluginOrder(ReactNativeEventPluginOrder);
 
 /**
  * Some important event plugins included by default (without having to require
  * them).
  */
-EventPluginHub.injection.injectEventPluginsByName({
+injectEventPluginsByName({
   ResponderEventPlugin: ResponderEventPlugin,
   ReactNativeBridgeEventPlugin: ReactNativeBridgeEventPlugin,
 });

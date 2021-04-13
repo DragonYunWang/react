@@ -4,36 +4,62 @@ const {readdirSync, statSync} = require('fs');
 const {join} = require('path');
 const baseConfig = require('./config.base');
 
+process.env.IS_BUILD = true;
+
+const NODE_MODULES_DIR =
+  process.env.RELEASE_CHANNEL === 'stable' ? 'oss-stable' : 'oss-experimental';
+
 // Find all folders in packages/* with package.json
 const packagesRoot = join(__dirname, '..', '..', 'packages');
 const packages = readdirSync(packagesRoot).filter(dir => {
   if (dir.charAt(0) === '.') {
     return false;
   }
-  if (dir === 'events') {
-    // There's an actual Node package called "events"
-    // that's used by jsdom so we don't want to alias that.
+  const packagePath = join(packagesRoot, dir, 'package.json');
+  let stat;
+  try {
+    stat = statSync(packagePath);
+  } catch (err) {
     return false;
   }
-  const packagePath = join(packagesRoot, dir, 'package.json');
-  return statSync(packagePath).isFile();
+  return stat.isFile();
 });
+
 // Create a module map to point React packages to the build output
 const moduleNameMapper = {};
+
+// Allow bundle tests to read (but not write!) default feature flags.
+// This lets us determine whether we're running in different modes
+// without making relevant tests internal-only.
+moduleNameMapper[
+  '^shared/ReactFeatureFlags'
+] = `<rootDir>/packages/shared/forks/ReactFeatureFlags.readonly`;
+
+// Map packages to bundles
 packages.forEach(name => {
   // Root entry point
-  moduleNameMapper[`^${name}$`] = `<rootDir>/build/node_modules/${name}`;
+  moduleNameMapper[
+    `^${name}$`
+  ] = `<rootDir>/build2/${NODE_MODULES_DIR}/${name}`;
   // Named entry points
   moduleNameMapper[
-    `^${name}/(.*)$`
-  ] = `<rootDir>/build/node_modules/${name}/$1`;
+    `^${name}\/([^\/]+)$`
+  ] = `<rootDir>/build2/${NODE_MODULES_DIR}/${name}/$1`;
 });
 
 module.exports = Object.assign({}, baseConfig, {
   // Redirect imports to the compiled bundles
   moduleNameMapper,
-  // Don't run bundle tests on blacklisted -test.internal.* files
+  modulePathIgnorePatterns: [
+    ...baseConfig.modulePathIgnorePatterns,
+    'packages/react-devtools-shared',
+  ],
+  // Don't run bundle tests on -test.internal.* files
   testPathIgnorePatterns: ['/node_modules/', '-test.internal.js$'],
   // Exclude the build output from transforms
-  transformIgnorePatterns: ['/node_modules/', '<rootDir>/build/'],
+  transformIgnorePatterns: ['/node_modules/', '<rootDir>/build2/'],
+  setupFiles: [
+    ...baseConfig.setupFiles,
+    require.resolve('./setupTests.build.js'),
+  ],
 });

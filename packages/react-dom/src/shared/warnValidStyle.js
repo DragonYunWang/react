@@ -1,11 +1,9 @@
 /**
- * Copyright (c) 2013-present, Facebook, Inc.
+ * Copyright (c) Facebook, Inc. and its affiliates.
  *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
-
-import warning from 'shared/warning';
 
 let warnValidStyle = () => {};
 
@@ -35,8 +33,7 @@ if (__DEV__) {
     }
 
     warnedStyleNames[name] = true;
-    warning(
-      false,
+    console.error(
       'Unsupported style property %s. Did you mean %s?',
       name,
       // As Andi Smith suggests
@@ -52,8 +49,7 @@ if (__DEV__) {
     }
 
     warnedStyleNames[name] = true;
-    warning(
-      false,
+    console.error(
       'Unsupported vendor-prefixed style property %s. Did you mean %s?',
       name,
       name.charAt(0).toUpperCase() + name.slice(1),
@@ -66,8 +62,7 @@ if (__DEV__) {
     }
 
     warnedStyleValues[value] = true;
-    warning(
-      false,
+    console.error(
       "Style property values shouldn't contain a semicolon. " +
         'Try "%s: %s" instead.',
       name,
@@ -81,8 +76,7 @@ if (__DEV__) {
     }
 
     warnedForNaNValue = true;
-    warning(
-      false,
+    console.error(
       '`NaN` is an invalid value for the `%s` css style property.',
       name,
     );
@@ -94,8 +88,7 @@ if (__DEV__) {
     }
 
     warnedForInfinityValue = true;
-    warning(
-      false,
+    console.error(
       '`Infinity` is an invalid value for the `%s` css style property.',
       name,
     );
